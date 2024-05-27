@@ -1,71 +1,170 @@
 ---
-title: "A3: Incarceration"
+title: "Assignment 5 - Data Visualization (Incarceration)"
+author: "Ryder Forsythe"
+date: "2024-05-27"
 output: html_document
 ---
 
-### Introduction
+## Introduction
 
-An introduction of the problem domain and a description of the variable(s) you are choosing to analyze (and why!)
+I chose to look at the percentage of incarcerated individuals who are not white, and compared that to the percentage of nonwhite individuals between ages 15 and 64 in the general population. The total percentage of incarcerated individuals who are not white in 2016, the most recent year with complete data, is 60.25%, far higher than the percentage of nonwhite people between the ages of 15 and 64 in the general population, which in 2016 was 39.67%. This percentage is highest in the state of California, at 78.48%. This percentage has decreased by 17.5% since 1990, when 77.6% of the incarcerated population was not white, a staggeringly higher percentage than in the general population, which was only 24.25% nonwhite. This indicates a dramatic, systemic bias in which people were incarcerated - one that has only somewhat abated since then.
 
-### Summary Information
+## Data
 
-Write a summary paragraph of findings that includes the 5 values calculated from your summary information R script
+These datasets were collated and published by the Vera Institute of Justice, using public datasets from the United States Department of Justice Bureau of Justice Statistics (BJS), as well as from various state departments of correction where federal data was not available or incomplete. These agencies collected data through a variety of surveys and sources, including the National Corrections Reporting Program, the Annual Survey of Jails, the Census of Jails, the Uniform Crime Reporting Program, National Vital Statistics System Data from the Department of Agriculture, and the Death in Custody Reporting Program. All together, this dataset presents as complete a look as possible at race and ethnicity in prisons and jails in the United States from 1970 to 2018, aggregated by county. In the Prison Population (prison_pop) dataset, which I focused on, there are 153811 rows and 37 columns. This dataset intersects two very important societal areas of interest - mass incarceration and systemic racial discrimination. It is therefore very important that this be as accurate to the real world as possible, because it demonstrates a clear set of systemic biases towards the incarceration of nonwhite people. Several states do not have counties with recorded prison populations; racial data within prisons is only available from 1990 on, and it is unclear whether any counties with prisons have been excluded due to a lack of data.
 
-These will likely be calculated using your DPLYR skills, answering questions such as: 
+## Trends Over Time
 
-- What is the average value of my variable across all the counties (in the current year)?
-- Where is my variable the highest / lowest?
-- How much has my variable change over the last N years?
+```{r}
+# load packages and data
+library(tidyverse)
+library(scales)
 
-Feel free to calculate and report values that you find relevant. Again, remember that the purpose is to think about how these measure of incarceration vary by race.
+prison_pop <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-pop.csv"))
 
-### The Dataset
+# create new variables and set up new dataframe grouped by year
+prison_pop_by_year <- prison_pop %>% 
+  group_by(year) %>%
+  summarize(
+    prison_percent_nonwhite = 1 - sum(white_prison_pop, na.rm = TRUE) / sum(total_prison_pop, na.rm = TRUE),
+    total_percent_nonwhite = 1 - sum(white_pop_15to64, na.rm = TRUE)/sum(total_pop_15to64, na.rm = TRUE)
+  )
 
-Who collected the data?  
-How was the data collected or generated?  
-Why was the data collected?  
-How many observations (rows) are in your data?  
-How many features (columns) are in the data?  
-What, if any, ethical questions or questions of power do you need to consider when working with this data?  
-What are possible limitations or problems with this data?   (at least 200 words)
+# create line graph
+legend_colors <- c("Prison Nonwhite %" = "coral3", "Total Nonwhite %" = "dodgerblue3")
+chart1 <- filter(prison_pop_by_year, year > 1989 & year < 2017) %>% ggplot(aes(x = year)) +
+  geom_line(aes(y = prison_percent_nonwhite, color = "Prison Nonwhite %"), linewidth = 1) +
+  geom_line(aes(y = total_percent_nonwhite, color = "Total Nonwhite %"), linewidth = 1) +
+  coord_cartesian(xlim = c(1990, 2016), ylim = c(0, 1)) +
+  labs(
+    x = "Year",
+    title = "Nationwide Nonwhite Percentage of Prison and Total Population, 1990-2016",
+    color = "Legend"
+  ) +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(from = 1990, to = 2016, by = 5)) +
+  scale_y_continuous(labels = percent) +
+  scale_color_manual(values = legend_colors)
 
-
-### Trends Over Time Chart
-
-Include a chart. Make sure to describe why you included the chart, and what patterns emerged
-
-The first chart that you will create and include will show the trend over time of your variable/topic. Think carefully about what you want to communicate to your user (you may have to find relevant trends in the dataset first!). Here are some requirements to help guide your design:
-
-- Show more than one, but fewer than ~10 trends
-  - This may mean showing the same measure for different locations or different racial groups. Think carefully about a meaningful comparison of locations (e.g., the top 10 counties in a state, top 10 states, etc.)
-- You must have clear x and y axis labels
-- The chart needs a clear title 
-- You need a legend for your different line colors and a clear legend title
-
-When we say "clear" or "human readable" titles and labels, that means that you should not just display the variable name.
-
-Here's an example of how to run an R script inside an RMarkdown file:
-
-``````{r, echo = FALSE, code = readLines("chart1_example.R")}
+chart1
 ```
 
-### Variable Comparison Chart
+## Variable Comparison
 
-Include a chart. Make sure to describe why you included the chart, and what patterns emerged
+```{r}
 
-The second chart that you will create and include will show how two different (continuous) variables are related to one another. Again, think carefully about what such a comparison means and what you want to communicate to your user (you may have to find relevant trends in the dataset first!). Here are some requirements to help guide your design:
+# isolate 2016
+prison_pop_2016 <- prison_pop %>% filter(year == "2016") %>%
+  mutate(nonwhite_total_percentage = 1 - white_pop_15to64/total_pop_15to64,
+         nonwhite_prison_percentage = 1 - white_prison_pop/total_prison_pop
+         )
+# create scatterplot
+prison_pop_2016 %>% ggplot(aes(x = nonwhite_total_percentage, y = nonwhite_prison_percentage)) +
+  geom_point(aes(size = total_prison_pop), alpha = 0.3) +
+  labs(
+    x = "Nonwhite % of County Population",
+    y = "Nonwhite % of Prison Population",
+    title = "Nonwhite % of Total Population vs Prison Population, by County, 2016",
+    size = "# of Incarcerated Individuals"
+  ) +
+  theme_minimal() +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent)
+```
 
-- You must have clear x and y axis labels
-- The chart needs a clear title 
-- If you choose to add a color encoding (not required), you need a legend for your different color and a clear legend title
+## Map
 
-### Map
+```{r}
+install.packages("scales")
+install.packages("maps")
 
-Include a chart. Make sure to describe why you included the chart, and what patterns emerged
+library(tidyverse)
+library(scales)
+library(sf)
+library(maps)
 
-The last chart that you will create and include will show how a variable is distributed geographically. Again, think carefully about what such a comparison means and what you want to communicate to your user (you may have to find relevant trends in the dataset first!). Here are some requirements to help guide your design:
 
-- Your map needs a title
-- Your color scale needs a legend with a clear label
-- Use a map based coordinate system to set the aspect ratio of your map
+prison_pop <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-pop.csv"))
+jail_pop <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-jail-pop.csv"))
+prison_jail_rates <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-jail-rates.csv"))
+prison_jail_rates_1990 <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-jail-rates-1990.csv"))
+prison_jail_rates_1990_WA <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-jail-rates-1990-WA.csv"))
 
+states <- map_data("state")
+
+prison_pop$state <- prison_pop$state %>% 
+  case_match("AL" ~ "alabama",
+             "AK" ~ "alaska",
+             "AZ" ~ "arizona", 
+             "AR" ~ "arkansas",
+             "CA" ~ "california",
+             "CO" ~ "colorado",
+             "CT" ~ "connecticut",
+             "DE" ~ "delaware",
+             "DC" ~ "district of columbia",
+             "FL" ~ "florida",
+             "GA" ~ "georgia",
+             "HI" ~ "hawaii",
+             "ID" ~ "idaho",
+             "IL" ~ "illinois", 
+             "IN" ~ "indiana",
+             "IA" ~ "iowa",
+             "KS" ~ "kansas",
+             "KY" ~ "kentucky",
+             "LA" ~ "louisiana",
+             "ME" ~ "maine",
+             "MD" ~ "maryland",
+             "MA" ~ "massachusetts",
+             "MI" ~ "michigan",
+             "MN" ~ "minnesota",
+             "MS" ~ "mississippi",
+             "MO" ~ "missouri", 
+             "MT" ~ "montana",
+             "NE" ~ "nebraska",
+             "NV" ~ "nevada",
+             "NH" ~ "new hampshire",
+             "NJ" ~ "new jersey",
+             "NM" ~ "new mexico",
+             "NY" ~ "new york",
+             "NC" ~ "north carolina",
+             "ND" ~ "north dakota",
+             "OH" ~ "ohio",
+             "OK" ~ "oklahoma", 
+             "OR" ~ "oregon",
+             "PA" ~ "pennsylvania",
+             "RI" ~ "rhode island",
+             "SC" ~ "south carolina",
+             "SD" ~ "south dakota",
+             "TN" ~ "tennessee",
+             "TX" ~ "texas",
+             "UT" ~ "utah",
+             "VT" ~ "vermont",
+             "VA" ~ "virginia",
+             "WA" ~ "washington",
+             "WV" ~ "west virginia",
+             "WI" ~ "wisconsin",
+             "WY" ~ "wyoming"
+               ) 
+
+prison_pop_mapping <- prison_pop %>% 
+  filter(year == 2016) %>%
+  mutate(region = state) %>%
+  group_by(region) %>%
+  summarize(nonwhite_prison_percentage = 1 - sum(white_prison_pop, na.rm = TRUE)/sum(total_prison_pop, na.rm = TRUE), 
+            nonwhite_total_percentage = 1 - sum(white_pop_15to64, na.rm = TRUE)/sum(total_pop_15to64, na.rm = TRUE))
+
+
+map_df <- merge(prison_pop_mapping, states, by = "region")
+  
+map_df %>% ggplot(aes(x = long, y = lat)) +
+  geom_polygon(aes(group = group, fill = nonwhite_prison_percentage)) + 
+  coord_map("albers", lat0 = 45.5, lat1 = 29.5) +
+  theme_minimal() +
+  labs(
+    x = "longitude",
+    y = "latitude",
+    title = "Nonwhite Percentage of Incarcerated Population by State",
+    fill = "Nonwhite % of Prison Population"
+  ) +
+  scale_fill_viridis_c()
+```
