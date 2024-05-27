@@ -49,6 +49,8 @@ chart1 <- filter(prison_pop_by_year, year > 1989 & year < 2017) %>% ggplot(aes(x
 chart1
 ```
 
+I wanted to look at how the nonwhite proportion of incarcerated individuals has changed over time as the racial makeup of the general population has changed. Counterintuitively, while the United States has become less white over time, the proportion of incarcerated individuals who are white has increased. This could be explained by a systemic bias towards the incarceration of nonwhite people decreasing over time; as the chart indicates, nonwhite people are still very disproportionately incarcerated - by a factor of more than 2 to 1 in 2016 - but the bias seems to be becoming less pronounced.
+
 ## Variable Comparison
 
 ```{r}
@@ -72,26 +74,22 @@ prison_pop_2016 %>% ggplot(aes(x = nonwhite_total_percentage, y = nonwhite_priso
   scale_y_continuous(labels = percent)
 ```
 
+This plot shows the the nonwhite percentage of a county's population (from ages 15 to 64) plotted against the percentage of incarcerated people in that county who are nonwhite, as of 2016. What this shows is that there is a clear correlation between the nonwhite general population and the nonwhite prison population, but also that this relationship isn't quite linear. As the nonwhite percentage of a county's population increases, the nonwhite percentage of their incarcerated population generally increases much faster, to the point where a very large number of majority-white counties have majority-nonwhite prisons. This relationship becomes less extreme as the county becomes more nonwhite - it looks more like a logarithmic relationship than a linear one. The points on the scatterplot are also sized based on the absolute number of incarcerated people in each county - this is to illustrate the fact that although the vast majority of counties are very white, the largest counties are generally much less white and have many orders of magnitude more people.
+
 ## Map
 
 ```{r}
-install.packages("scales")
-install.packages("maps")
-
+# load packages and data
 library(tidyverse)
 library(scales)
 library(sf)
 library(maps)
 
-
 prison_pop <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-pop.csv"))
-jail_pop <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-jail-pop.csv"))
-prison_jail_rates <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-jail-rates.csv"))
-prison_jail_rates_1990 <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-jail-rates-1990.csv"))
-prison_jail_rates_1990_WA <- read.csv(url("https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/us-prison-jail-rates-1990-WA.csv"))
 
 states <- map_data("state")
 
+# reformat states to match map_data package defaults
 prison_pop$state <- prison_pop$state %>% 
   case_match("AL" ~ "alabama",
              "AK" ~ "alaska",
@@ -145,7 +143,7 @@ prison_pop$state <- prison_pop$state %>%
              "WI" ~ "wisconsin",
              "WY" ~ "wyoming"
                ) 
-
+# set up new dataframe for merging
 prison_pop_mapping <- prison_pop %>% 
   filter(year == 2016) %>%
   mutate(region = state) %>%
@@ -153,9 +151,10 @@ prison_pop_mapping <- prison_pop %>%
   summarize(nonwhite_prison_percentage = 1 - sum(white_prison_pop, na.rm = TRUE)/sum(total_prison_pop, na.rm = TRUE), 
             nonwhite_total_percentage = 1 - sum(white_pop_15to64, na.rm = TRUE)/sum(total_pop_15to64, na.rm = TRUE))
 
-
+# merge state shapes with prison dataset
 map_df <- merge(prison_pop_mapping, states, by = "region")
   
+# create the map
 map_df %>% ggplot(aes(x = long, y = lat)) +
   geom_polygon(aes(group = group, fill = nonwhite_prison_percentage)) + 
   coord_map("albers", lat0 = 45.5, lat1 = 29.5) +
@@ -163,8 +162,10 @@ map_df %>% ggplot(aes(x = long, y = lat)) +
   labs(
     x = "longitude",
     y = "latitude",
-    title = "Nonwhite Percentage of Incarcerated Population by State",
+    title = "Nonwhite Percentage of Incarcerated Population by State, 2016",
     fill = "Nonwhite % of Prison Population"
   ) +
   scale_fill_viridis_c()
 ```
+
+This map depicts the nonwhite percentage of incarcerated people by state in 2016. There are some clear regional trends in the dataset: New York and New Jersey, both situated in the New York City metropolitan area, have very nonwhite prison populations, as does California; smaller and more rural states generally have a whiter prison population - see Maine, Vermont, Kentucky, and Wyoming. However, the South appears to have a much higher proportion of nonwhite people behind bars than its neighbors, despite these states being generally as whiter and more rural than, for example, Nevada. This indicates some degree of regional policy, culture, or socioeconomic factors that might influence the way that nonwhite people are treated by the judicial system.
